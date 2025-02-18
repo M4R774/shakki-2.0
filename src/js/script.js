@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Set up mode selection handlers
     const newGameBtn = document.getElementById('newGameBtn');
-    const multiPlayerBtn = document.getElementById('multiPlayerMode');
     const startButton = document.getElementById('startGame');
     const gameContainer = document.querySelector('.game-container');
     const modeSelectionMenu = document.querySelector('.mode-selection-menu');
@@ -19,7 +18,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('Elements found:', { 
         newGameBtn, 
-        multiPlayerBtn, 
         startButton, 
         gameContainer, 
         modeSelectionMenu,
@@ -92,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
             startButton.textContent = 'Restart Game';
             
             // Initialize the game with the player configuration
-            await game.initializeGame(totalPlayers, false);
+            await game.initializeGame(totalPlayers);
             
             // Add AI players based on the configuration
             const playerColors = ['white', 'black', 'red', 'blue'];
@@ -121,11 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
         modeSelectionMenu.style.display = 'flex';
     });
 
-    // Disable multiplayer for now
-    multiPlayerBtn.disabled = true;
-    multiPlayerBtn.style.opacity = '0.6';
-    multiPlayerBtn.style.cursor = 'not-allowed';
-
     // Start/Restart button
     startButton.addEventListener('click', async () => {
         if (isInitializing) {
@@ -147,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // Initialize the game with the player configuration
-            await game.initializeGame(totalPlayers, false);
+            await game.initializeGame(totalPlayers);
             
             // Add AI players based on the configuration
             const playerColors = ['white', 'black', 'red', 'blue'];

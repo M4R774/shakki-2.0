@@ -1050,90 +1050,6 @@ body {
     left: -5px;
 }
 
-/* Multiplayer Menu Styles */
-.multiplayer-menu {
-    background-color: rgba(0, 0, 0, 0.8);
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-
-.menu-content {
-    background-color: #fff;
-    padding: 2rem;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    max-width: 400px;
-    width: 90%;
-}
-
-.menu-content h2 {
-    text-align: center;
-    margin-bottom: 1.5rem;
-    color: #333;
-}
-
-.auth-section,
-.room-section,
-.room-info {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.menu-content input {
-    padding: 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 1rem;
-}
-
-.menu-content button {
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 4px;
-    background-color: #4CAF50;
-    color: white;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: background-color 0.3s;
-}
-
-.menu-content button:hover {
-    background-color: #45a049;
-}
-
-.menu-content button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-}
-
-.player-item {
-    padding: 0.5rem;
-    background-color: #f5f5f5;
-    border-radius: 4px;
-    margin-bottom: 0.5rem;
-}
-
-#playerList {
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-#leaveRoom {
-    background-color: #f44336;
-}
-
-#leaveRoom:hover {
-    background-color: #da190b;
-}
-
 /* Mode Selection Menu Styles */
 .mode-selection-menu {
     background-color: rgba(0, 0, 0, 0.8);
@@ -1589,4 +1505,15 @@ body {
         font-size: 1rem;
         min-width: 100px;
     }
+}
+
+/* Remove multiplayer-related styles */
+.multiplayer-menu,
+.multiplayer-options,
+.join-game-section,
+#gameIdInput,
+#createGame,
+#joinGame,
+#backFromMultiplayer {
+    display: none;
 }

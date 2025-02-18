@@ -12,7 +12,6 @@
             <h2>Select Game Mode</h2>
             <div class="game-modes">
                 <button id="newGameBtn" class="control-button">Local</button>
-                <button id="multiPlayerMode" class="control-button" disabled style="opacity: 0.6; cursor: not-allowed;">Online Multiplayer (Coming Soon)</button>
             </div>
             <div class="game-description">
                 <h2>About the Game</h2>
@@ -84,28 +83,6 @@
         </div>
     </div>
 
-    <div class="multiplayer-menu" style="display: none;">
-        <div class="menu-content">
-            <h2>Online Multiplayer</h2>
-            <div class="auth-section">
-                <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
-                <button id="joinGame" class="control-button">Join Game</button>
-            </div>
-            <div class="room-section" style="display: none;">
-                <input type="text" id="roomCode" placeholder="Enter room code">
-                <button id="createRoom" class="control-button">Create Room</button>
-                <button id="joinRoom" class="control-button">Join Room</button>
-                <button id="backToModeSelect" class="control-button">Back</button>
-            </div>
-            <div class="room-info" style="display: none;">
-                <h3>Room: <span id="currentRoom"></span></h3>
-                <div id="playerList"></div>
-                <button id="startOnlineGame" class="control-button disabled">Start Game</button>
-                <button id="leaveRoom" class="control-button">Leave Room</button>
-            </div>
-        </div>
-    </div>
-
     <div class="game-container" style="display: none;">
         <div class="game-header">
             <div class="turn-indicator white">Current Turn: White</div>
@@ -144,6 +121,7 @@
         <source src="sounds/goodiehut.mp3" type="audio/mpeg">
     </audio>
 
+    <script src="src/js/env.js"></script>
     <script type="module" src="src/js/script.js"></script>
 </body>
 </html>

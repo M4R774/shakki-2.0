@@ -26,15 +26,21 @@ export class Game {
         
         // Initialize managers
         this.soundManager = new SoundManager();
-        this.uiManager = new UIManager(this);
         this.boardManager = new BoardManager(this);
         this.pieceManager = new PieceManager(this);
         this.visibilityManager = new VisibilityManager(this);
         this.aiManager = new AIManager(this);
-        this.isOnlineGame = false;
 
-        // Set up event listeners
-        this.setupEventListeners();
+        // Initialize UI manager after DOM is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.uiManager = new UIManager(this);
+                this.setupEventListeners();
+            });
+        } else {
+            this.uiManager = new UIManager(this);
+            this.setupEventListeners();
+        }
     }
 
     /**
@@ -80,7 +86,6 @@ export class Game {
         this.movesRemaining = {};
         this.exploredSquares = {};
         this.movedPieces.clear();
-        this.isOnlineGame = false;
         this.aiManager.aiPlayers.clear();
     }
 
@@ -103,17 +108,30 @@ export class Game {
     /**
      * Initialize the game with the given configuration
      */
-    async initializeGame(playerCount, isOnline = false, withAI = false) {
-        console.log('Initializing game:', { playerCount, isOnline, withAI });
+    async initializeGame(playerCount, withAI = false) {
+        console.log('Initializing game:', { playerCount, withAI });
         
         try {
+            // Wait for UI manager to be initialized
+            if (!this.uiManager) {
+                await new Promise(resolve => {
+                    const checkUI = () => {
+                        if (this.uiManager) {
+                            resolve();
+                        } else {
+                            setTimeout(checkUI, 100);
+                        }
+                    };
+                    checkUI();
+                });
+            }
+
             // Prevent multiple initializations
             if (this.isGameInProgress) {
                 console.log('Game already in progress, resetting first...');
                 this.resetGameState();
             }
 
-            this.isOnlineGame = isOnline;
             this.isGameInProgress = true;
             
             // Initialize game state
@@ -144,8 +162,10 @@ export class Game {
                 });
             });
 
-            console.log('Updating game state...');
-            await this.updateGameState();
+            // Update the UI with initial game state
+            const visibleSquares = this.visibilityManager.getVisibleSquares(this.currentPlayer);
+            this.uiManager.createBoard(this.board, visibleSquares);
+            this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
 
             // If the first player is AI, trigger their turn after a short delay
             if (this.aiManager.isAIPlayer(this.currentPlayer)) {
@@ -329,7 +349,9 @@ export class Game {
     selectPiece(row, col) {
         this.selectedPiece = { row, col };
         this.validMoves = this.pieceManager.getValidMoves(row, col);
-        this.updateGameState();
+        const visibleSquares = this.visibilityManager.getVisibleSquares(this.currentPlayer);
+        this.uiManager.createBoard(this.board, visibleSquares);
+        this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
     }
 
     /**
@@ -338,7 +360,9 @@ export class Game {
     clearSelection() {
         this.selectedPiece = null;
         this.validMoves = [];
-        this.updateGameState();
+        const visibleSquares = this.visibilityManager.getVisibleSquares(this.currentPlayer);
+        this.uiManager.createBoard(this.board, visibleSquares);
+        this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
     }
 
     /**
@@ -384,7 +408,9 @@ export class Game {
                 if (targetCell.type === 'king') {
                     this.board[toRow][toCol] = piece;
                     this.board[fromRow][fromCol] = null;
-                    await this.updateGameState(); // Update state before handling king capture
+                    const visibleSquares = this.visibilityManager.getVisibleSquares(this.currentPlayer);
+                    this.uiManager.createBoard(this.board, visibleSquares);
+                    this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
                     await this.handleKingCapture(targetCell.color);
                     return;
                 }
@@ -397,7 +423,14 @@ export class Game {
         }
 
         this.clearSelection();
-        await this.updateGameState();
+        const visibleSquares = this.visibilityManager.getVisibleSquares(this.currentPlayer);
+        this.uiManager.createBoard(this.board, visibleSquares);
+        this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
+
+        // If next player is AI, trigger their turn
+        if (this.aiManager.isAIPlayer(this.currentPlayer)) {
+            setTimeout(() => this.aiManager.makeAIMoves(), 500);
+        }
     }
 
     /**
@@ -441,7 +474,9 @@ export class Game {
      */
     async handleKingCapture(color) {
         // First update the game state to show the current board
-        await this.updateGameState();
+        const visibleSquares = this.visibilityManager.getVisibleSquares(this.currentPlayer);
+        this.uiManager.createBoard(this.board, visibleSquares);
+        this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
         
         // Remove all pieces of the defeated player
         for (let row = 0; row < this.board.length; row++) {
@@ -469,7 +504,9 @@ export class Game {
         }
         
         // Update game state to show removed pieces
-        await this.updateGameState();
+        const updatedVisibleSquares = this.visibilityManager.getVisibleSquares(this.currentPlayer);
+        this.uiManager.createBoard(this.board, updatedVisibleSquares);
+        this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
         
         // Switch turn if it was the current player's turn
         if (this.currentPlayer === color) {
@@ -516,7 +553,9 @@ export class Game {
             this.movedPieces.clear();
             
             // Update UI
-            await this.updateGameState();
+            const visibleSquares = this.visibilityManager.getVisibleSquares(this.currentPlayer);
+            this.uiManager.createBoard(this.board, visibleSquares);
+            this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
             
             // If next player is AI, trigger their turn
             if (this.aiManager.isAIPlayer(nextPlayer)) {
@@ -530,17 +569,9 @@ export class Game {
         }
     }
 
-    /**
-     * Update game state and UI
-     */
-    async updateGameState() {
-        try {
-            const visibleSquares = this.visibilityManager.getVisibleSquares(this.currentPlayer);
-            this.uiManager.createBoard(this.board, visibleSquares);
-            this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
-        } catch (error) {
-            console.error('Error updating game state:', error);
-            this.uiManager.showMessage('Failed to update game state. Please refresh the page.', 'warning');
-        }
+    updateGameState() {
+        const visibleSquares = this.visibilityManager.getVisibleSquares(this.currentPlayer);
+        this.uiManager.createBoard(this.board, visibleSquares);
+        this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
     }
 } 
