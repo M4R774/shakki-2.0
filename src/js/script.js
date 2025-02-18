@@ -101,6 +101,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     game.aiManager.addAIPlayer(playerColors[index]);
                 }
             });
+
+            // If the first player is AI, end turn immediately
+            if (playerTypes[0] === 'ai') {
+                console.log('First player is AI, ending turn automatically');
+                await game.switchTurn();
+            }
         } catch (error) {
             console.error('Failed to start game:', error);
             setupMenu.style.display = 'flex';
@@ -150,6 +156,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     game.aiManager.addAIPlayer(playerColors[index]);
                 }
             });
+
+            // If the first player is AI, end turn immediately
+            if (playerTypes[0] === 'ai') {
+                console.log('First player is AI, ending turn automatically');
+                await game.switchTurn();
+            }
         } catch (error) {
             console.error('Failed to restart game:', error);
         } finally {

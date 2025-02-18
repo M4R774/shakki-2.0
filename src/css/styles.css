@@ -53,18 +53,6 @@ body {
     align-items: center;
 }
 
-.setup-controls label {
-    font-size: 0.9em;
-}
-
-.setup-controls select {
-    padding: 5px;
-    border-radius: 5px;
-    background: #2d3139;
-    color: white;
-    border: 1px solid #3a4149;
-}
-
 .control-button {
     padding: 8px 12px;
     border: none;
