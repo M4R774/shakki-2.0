@@ -16,7 +16,7 @@ export class PieceManager {
      */
     getValidMoves(row, col) {
         const piece = this.game.board[row][col];
-        if (!piece) return [];
+        if (!piece || piece.terrain) return [];
 
         const moveGenerators = {
             pawn: () => this.getPawnMoves(row, col),
@@ -31,6 +31,40 @@ export class PieceManager {
     }
 
     /**
+     * Check if a cell can be moved to or captured
+     * @param {Object} targetCell - The cell to check
+     * @param {string} pieceColor - Color of the moving piece
+     * @returns {Object} Object containing canMove and shouldStop flags
+     */
+    validateCell(targetCell, pieceColor) {
+        // If no cell, it's a valid move
+        if (!targetCell) {
+            return { canMove: true, shouldStop: false };
+        }
+
+        // If it's terrain (including goodie huts), can't move there (except goodie huts)
+        if (targetCell.terrain) {
+            if (targetCell.terrain === TERRAIN_TYPES.GOODIE_HUT) {
+                return { canMove: true, shouldStop: true };
+            }
+            return { canMove: false, shouldStop: true };
+        }
+
+        // If it's a piece
+        if (targetCell.color) {
+            // Can't move to friendly pieces
+            if (targetCell.color === pieceColor) {
+                return { canMove: false, shouldStop: true };
+            }
+            // Can capture enemy pieces
+            return { canMove: true, shouldStop: true };
+        }
+
+        // Shouldn't get here, but just in case
+        return { canMove: false, shouldStop: true };
+    }
+
+    /**
      * Get valid moves for a pawn
      * @param {number} row - Current row
      * @param {number} col - Current column
@@ -40,15 +74,15 @@ export class PieceManager {
         const piece = this.game.board[row][col];
         const moves = [];
         
-        // Normal moves (orthogonal)
+        // Normal moves (orthogonal) - can only move to empty squares
         this.addMovesInDirections(row, col, DIRECTIONS.ORTHOGONAL, moves, 
             (targetCell) => !targetCell);
 
-        // Capture moves (diagonal) - including goodie huts
+        // Capture moves (diagonal) - can only capture pieces and goodie huts
         this.addMovesInDirections(row, col, DIRECTIONS.DIAGONAL, moves, 
             (targetCell) => targetCell && (
                 targetCell.terrain === TERRAIN_TYPES.GOODIE_HUT || 
-                (!targetCell.terrain && targetCell.color !== piece.color)
+                (targetCell.color && targetCell.color !== piece.color)
             ));
 
         return moves;
@@ -64,9 +98,18 @@ export class PieceManager {
         const moves = [];
         const pieceColor = this.game.board[row][col].color;
 
-        this.addMovesInDirections(row, col, DIRECTIONS.KNIGHT, moves, 
-            () => true, // We'll validate in isValidDestination
-            (newRow, newCol) => this.isValidDestination(newRow, newCol, pieceColor));
+        DIRECTIONS.KNIGHT.forEach(([rowOffset, colOffset]) => {
+            const newRow = row + rowOffset;
+            const newCol = col + colOffset;
+
+            if (this.isInBounds(newRow, newCol)) {
+                const targetCell = this.game.board[newRow][newCol];
+                const { canMove } = this.validateCell(targetCell, pieceColor);
+                if (canMove) {
+                    moves.push({ row: newRow, col: newCol });
+                }
+            }
+        });
 
         return moves;
     }
@@ -81,9 +124,18 @@ export class PieceManager {
         const moves = [];
         const pieceColor = this.game.board[row][col].color;
 
-        this.addMovesInDirections(row, col, DIRECTIONS.ALL, moves, 
-            () => true, // We'll validate in isValidDestination
-            (newRow, newCol) => this.isValidDestination(newRow, newCol, pieceColor));
+        DIRECTIONS.ALL.forEach(([rowOffset, colOffset]) => {
+            const newRow = row + rowOffset;
+            const newCol = col + colOffset;
+
+            if (this.isInBounds(newRow, newCol)) {
+                const targetCell = this.game.board[newRow][newCol];
+                const { canMove } = this.validateCell(targetCell, pieceColor);
+                if (canMove) {
+                    moves.push({ row: newRow, col: newCol });
+                }
+            }
+        });
 
         return moves;
     }
@@ -105,25 +157,13 @@ export class PieceManager {
 
             while (this.isInBounds(newRow, newCol)) {
                 const targetCell = this.game.board[newRow][newCol];
+                const { canMove, shouldStop } = this.validateCell(targetCell, piece.color);
                 
-                if (!targetCell) {
-                    // Empty square - valid move
+                if (canMove) {
                     moves.push({ row: newRow, col: newCol });
-                } else if (targetCell.terrain === TERRAIN_TYPES.GOODIE_HUT) {
-                    // Goodie hut - valid move and stop
-                    moves.push({ row: newRow, col: newCol });
-                    break;
-                } else if (targetCell.terrain) {
-                    // Other terrain - stop
-                    break;
-                } else if (targetCell.color !== piece.color) {
-                    // Enemy piece - valid move and stop
-                    moves.push({ row: newRow, col: newCol });
-                    break;
-                } else {
-                    // Friendly piece - stop
-                    break;
                 }
+                
+                if (shouldStop) break;
 
                 newRow += rowDir;
                 newCol += colDir;
@@ -137,15 +177,14 @@ export class PieceManager {
      * Helper method to add moves in given directions based on validation functions
      * @private
      */
-    addMovesInDirections(row, col, directions, moves, cellValidator, moveValidator = null) {
+    addMovesInDirections(row, col, directions, moves, cellValidator) {
         directions.forEach(([rowOffset, colOffset]) => {
             const newRow = row + rowOffset;
             const newCol = col + colOffset;
 
             if (this.isInBounds(newRow, newCol)) {
                 const targetCell = this.game.board[newRow][newCol];
-                if (cellValidator(targetCell) && 
-                    (!moveValidator || moveValidator(newRow, newCol))) {
+                if (cellValidator(targetCell)) {
                     moves.push({ row: newRow, col: newCol });
                 }
             }
@@ -164,22 +203,6 @@ export class PieceManager {
     }
 
     /**
-     * Check if a destination is valid for a piece
-     * @param {number} row - Destination row
-     * @param {number} col - Destination column
-     * @param {string} pieceColor - Color of the moving piece
-     * @returns {boolean} Whether the destination is valid
-     */
-    isValidDestination(row, col, pieceColor) {
-        if (!this.isInBounds(row, col)) return false;
-        
-        const targetCell = this.game.board[row][col];
-        return !targetCell || 
-               targetCell.terrain === TERRAIN_TYPES.GOODIE_HUT ||
-               targetCell.color !== pieceColor;
-    }
-
-    /**
      * Count the number of pieces a player has
      * @param {string} color - Player color
      * @returns {number} Number of pieces
@@ -188,7 +211,8 @@ export class PieceManager {
         let count = 0;
         for (let row = 0; row < this.game.board.length; row++) {
             for (let col = 0; col < this.game.board[row].length; col++) {
-                if (this.game.board[row][col]?.color === color) {
+                const cell = this.game.board[row][col];
+                if (cell?.color === color && !cell.terrain) {
                     count++;
                 }
             }
