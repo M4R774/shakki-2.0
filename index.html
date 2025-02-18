@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three-Player Chess</title>
+    <link rel="stylesheet" href="src/css/styles.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <div class="turn-indicator white">Current Turn: White</div>
+            <div class="controls-container">
+                <div class="setup-controls">
+                    <label for="playerCount">Players:</label>
+                    <select id="playerCount">
+                        <option value="2" selected>2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                    </select>
+                    <button id="startGame" class="control-button">Start Game</button>
+                </div>
+                <div class="sound-controls">
+                    <button class="sound-toggle control-button" title="Toggle Sound Effects">🔊</button>
+                    <button class="music-toggle control-button muted" title="Toggle Background Music">🎵</button>
+                </div>
+                <button class="end-turn-button" disabled>End Turn</button>
+            </div>
+        </div>
+        <div class="chessboard"></div>
+        <div class="game-description">
+            <h2>About the Game</h2>
+            <p>Welcome to this unique chess variant! Each player starts with 5 pieces:</p>
+            <ul>
+                <li>1 King (on the edge)</li>
+                <li>2 Random pieces (rook, knight, bishop, or queen) on the edge</li>
+                <li>2 Pawns positioned in front of other pieces</li>
+            </ul>
+            <p>Game Rules:</p>
+            <ul>
+                <li>Players get 3 moves per turn</li>
+                <li>Unused moves carry over to your next turn (max = number of your pieces)</li>
+                <li>Pieces have limited vision range in fog of war</li>
+                <li>Capture goodie huts to gain new pieces</li>
+                <li>Eliminate other players by capturing their king</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Audio elements -->
+    <audio id="moveSound" preload="auto">
+        <source src="sounds/move.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="captureSound" preload="auto">
+        <source src="sounds/capture.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="turnSound" preload="auto">
+        <source src="sounds/turn.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="gameOverSound" preload="auto">
+        <source src="sounds/gameover.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="backgroundMusic" loop>
+        <source src="sounds/background.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="goodieHutSound" preload="auto">
+        <source src="sounds/goodiehut.mp3" type="audio/mpeg">
+    </audio>
+
+    <script type="module" src="src/js/script.js"></script>
+</body>
+</html>
