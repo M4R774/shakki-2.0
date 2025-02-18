@@ -25,46 +25,80 @@ export class AIManager {
     }
 
     /**
+     * Get valid moves for AI considering fog of war
+     * @param {number} row - Starting row
+     * @param {number} col - Starting column
+     * @returns {Array} Array of valid moves
+     */
+    getValidMovesForAI(row, col) {
+        const visibleSquares = this.game.visibilityManager.getVisibleSquares(this.currentAIPlayer);
+        const allValidMoves = this.game.pieceManager.getValidMoves(row, col);
+        
+        // Filter moves to only include visible squares
+        return allValidMoves.filter(move => 
+            visibleSquares.has(`${move.row},${move.col}`)
+        );
+    }
+
+    /**
      * Make moves for the current AI player
      */
     async makeAIMoves() {
-        if (!this.isAIPlayer(this.game.currentPlayer)) {
-            return;
-        }
-
-        // Collect and execute all moves at once
-        const moves = [];
-        while (this.game.movesRemaining[this.game.currentPlayer] > 0) {
-            const move = this.findBestMove();
-            if (!move) break;
-            moves.push(move);
-            
-            // Update internal game state without visual updates
-            const piece = this.game.board[move.fromRow][move.fromCol];
-            const targetSquare = this.game.board[move.toRow][move.toCol];
-            
-            // Handle captures silently
-            if (targetSquare && !targetSquare.terrain) {
-                if (targetSquare.type === 'king') {
-                    this.game.handleKingCapture(targetSquare.color);
-                    return; // End turn immediately if a king is captured
+        this.currentAIPlayer = this.game.currentPlayer;
+        const visibleSquares = this.game.visibilityManager.getVisibleSquares(this.currentAIPlayer);
+        
+        while (this.game.movesRemaining[this.currentAIPlayer] > 0) {
+            // Find all AI pieces that haven't moved yet
+            const pieces = [];
+            for (let row = 0; row < this.game.board.length; row++) {
+                for (let col = 0; col < this.game.board[row].length; col++) {
+                    const piece = this.game.board[row][col];
+                    if (piece && 
+                        piece.color === this.currentAIPlayer && 
+                        !this.game.movedPieces.has(`${row},${col}`) &&
+                        visibleSquares.has(`${row},${col}`)) {
+                        pieces.push({ row, col, piece });
+                    }
                 }
             }
-
-            // Update board state
-            this.game.board[move.toRow][move.toCol] = piece;
-            this.game.board[move.fromRow][move.fromCol] = null;
-            this.game.movedPieces.add(`${move.toRow},${move.toCol}`);
-            this.game.movesRemaining[this.game.currentPlayer]--;
-
-            // Handle goodie hut captures silently
-            if (targetSquare?.terrain === 'goodieHut') {
-                this.handleGoodieHutSilently(move.toRow, move.toCol);
+            
+            if (pieces.length === 0) break;
+            
+            // For each piece, evaluate possible moves
+            let bestMove = null;
+            let bestScore = -Infinity;
+            
+            for (const { row, col, piece } of pieces) {
+                const validMoves = this.getValidMovesForAI(row, col);
+                
+                for (const move of validMoves) {
+                    const score = this.evaluateMove(row, col, move.row, move.col);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = { from: { row, col }, to: move };
+                    }
+                }
+            }
+            
+            if (bestMove) {
+                await this.game.movePiece(
+                    bestMove.from.row,
+                    bestMove.from.col,
+                    bestMove.to.row,
+                    bestMove.to.col
+                );
+                
+                // Add a small delay between moves
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } else {
+                break;
             }
         }
-
-        // Switch turn without transition
-        this.game.switchTurn();
+        
+        // End turn if no more moves available
+        if (this.game.currentPlayer === this.currentAIPlayer) {
+            await this.game.switchTurn();
+        }
     }
 
     /**
@@ -95,43 +129,7 @@ export class AIManager {
     }
 
     /**
-     * Find the best move for the current AI player
-     * @returns {Object|null} The best move found, or null if no moves available
-     */
-    findBestMove() {
-        const possibleMoves = [];
-        const currentColor = this.game.currentPlayer;
-
-        // Collect all possible moves for all pieces
-        for (let row = 0; row < this.game.board.length; row++) {
-            for (let col = 0; col < this.game.board[row].length; col++) {
-                const piece = this.game.board[row][col];
-                if (piece && piece.color === currentColor && !this.game.movedPieces.has(`${row},${col}`)) {
-                    const validMoves = this.game.pieceManager.getValidMoves(row, col);
-                    validMoves.forEach(move => {
-                        possibleMoves.push({
-                            fromRow: row,
-                            fromCol: col,
-                            toRow: move.row,
-                            toCol: move.col,
-                            score: this.evaluateMove(row, col, move.row, move.col)
-                        });
-                    });
-                }
-            }
-        }
-
-        if (possibleMoves.length === 0) {
-            return null;
-        }
-
-        // Sort moves by score and pick the best one
-        possibleMoves.sort((a, b) => b.score - a.score);
-        return possibleMoves[0];
-    }
-
-    /**
-     * Evaluate a move's score
+     * Evaluate a potential move
      * @param {number} fromRow - Starting row
      * @param {number} fromCol - Starting column
      * @param {number} toRow - Target row
@@ -139,47 +137,39 @@ export class AIManager {
      * @returns {number} Score for the move
      */
     evaluateMove(fromRow, fromCol, toRow, toCol) {
-        let score = 0;
         const piece = this.game.board[fromRow][fromCol];
-        const targetSquare = this.game.board[toRow][toCol];
-
+        const target = this.game.board[toRow][toCol];
+        let score = 0;
+        
         // Base score for piece values
         const pieceValues = {
-            'pawn': 1,
-            'knight': 3,
-            'bishop': 3,
-            'rook': 5,
-            'queen': 9,
-            'king': 0 // King doesn't move for captures typically
+            pawn: 1,
+            knight: 3,
+            bishop: 3,
+            rook: 5,
+            queen: 9,
+            king: 0 // Kings don't move towards capture
         };
-
-        // Prioritize captures
-        if (targetSquare && !targetSquare.terrain) {
-            score += pieceValues[targetSquare.type] * 10;
-            if (targetSquare.type === 'king') {
-                score += 1000; // Heavily prioritize king captures
+        
+        // Capturing moves
+        if (target) {
+            if (target.terrain === 'goodie-hut') {
+                score += 4; // Goodie huts are valuable
+            } else if (target.color !== this.currentAIPlayer) {
+                score += (pieceValues[target.type] || 0) * 2; // Double value for captures
+                if (target.type === 'king') {
+                    score += 100; // Huge bonus for capturing kings
+                }
             }
         }
-
-        // Prioritize goodie hut captures
-        if (targetSquare?.terrain === 'goodieHut') {
-            score += 15;
-        }
-
-        // Prioritize center control for non-king pieces
-        if (piece.type !== 'king') {
-            const centerRow = Math.floor(this.game.board.length / 2);
-            const centerCol = Math.floor(this.game.board[0].length / 2);
-            const currentDistanceToCenter = Math.abs(fromRow - centerRow) + Math.abs(fromCol - centerCol);
-            const newDistanceToCenter = Math.abs(toRow - centerRow) + Math.abs(toCol - centerCol);
-            if (newDistanceToCenter < currentDistanceToCenter) {
-                score += 2;
-            }
-        }
-
-        // Add some randomness to make AI less predictable
-        score += Math.random() * 2;
-
+        
+        // Movement towards center (for better board control)
+        const centerRow = Math.floor(this.game.board.length / 2);
+        const centerCol = Math.floor(this.game.board[0].length / 2);
+        const currentDistanceToCenter = Math.abs(fromRow - centerRow) + Math.abs(fromCol - centerCol);
+        const newDistanceToCenter = Math.abs(toRow - centerRow) + Math.abs(toCol - centerCol);
+        score += (currentDistanceToCenter - newDistanceToCenter) * 0.1;
+        
         return score;
     }
 } 

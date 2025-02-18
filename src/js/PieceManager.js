@@ -174,38 +174,25 @@ export class PieceManager {
         if (!this.isInBounds(row, col)) return false;
         
         const targetCell = this.game.board[row][col];
-        const piece = this.game.selectedPiece ? 
-            this.game.board[this.game.selectedPiece.row][this.game.selectedPiece.col] : null;
-            
-        // Allow knights to move through terrain if technology is unlocked
-        if (piece?.type === 'knight' && 
-            this.game.knightTerrainBypass && 
-            piece.color === this.game.currentPlayer) {
-            return !targetCell || targetCell.color !== pieceColor || 
-                   (targetCell.terrain && targetCell.terrain !== TERRAIN_TYPES.MOUNTAIN);
-        }
-        
-        // Never allow capturing friendly pieces
-        if (targetCell?.color === pieceColor) {
-            return false;
-        }
-        
-        // Allow movement to empty squares
-        if (!targetCell) {
-            return true;
-        }
-        
-        // Allow movement to goodie huts
-        if (targetCell.terrain === TERRAIN_TYPES.GOODIE_HUT) {
-            return true;
-        }
+        return !targetCell || 
+               targetCell.terrain === TERRAIN_TYPES.GOODIE_HUT ||
+               targetCell.color !== pieceColor;
+    }
 
-        // Allow capturing enemy pieces if no terrain
-        if (!targetCell.terrain && targetCell.color !== pieceColor) {
-            return true;
+    /**
+     * Count the number of pieces a player has
+     * @param {string} color - Player color
+     * @returns {number} Number of pieces
+     */
+    countPieces(color) {
+        let count = 0;
+        for (let row = 0; row < this.game.board.length; row++) {
+            for (let col = 0; col < this.game.board[row].length; col++) {
+                if (this.game.board[row][col]?.color === color) {
+                    count++;
+                }
+            }
         }
-
-        // Mountains and other terrain are impassable
-        return false;
+        return count;
     }
 } 

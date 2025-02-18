@@ -89,33 +89,23 @@ The game requires a modern browser that supports:
 - CSS Custom Properties
 - Web Audio API
 
+## Deployment to Render.com
+
+To deploy the game to Render.com:
+
+1. Create a new account on [Render.com](https://render.com) if you don't have one
+2. Fork this repository to your GitHub account
+3. In Render.com dashboard:
+   - Click "New +"
+   - Select "Static Site"
+   - Connect your GitHub repository
+   - Name your service (e.g., "three-player-chess")
+   - Set the build command to empty (no build needed)
+   - Set the publish directory to "./"
+   - Click "Create Static Site"
+
+The game will be automatically deployed and available at your Render.com URL. Any changes pushed to the main branch will trigger automatic redeployments.
+
 ## Contributing
 
 Feel free to submit issues and pull requests.
-
-## Firebase Setup
-
-To enable online multiplayer functionality, you need to set up Firebase:
-
-1. Create a new project in [Firebase Console](https://console.firebase.google.com/)
-2. Enable Realtime Database and Authentication in your Firebase project
-3. Copy `src/config/firebase.config.example.js` to `src/config/firebase.config.js`
-4. Replace the placeholder values in `firebase.config.js` with your Firebase project credentials:
-   - Find these values in your Firebase project settings
-   - The config object can be found in: Project Settings > General > Your Apps > Web App
-
-Example:
-```javascript
-export const firebaseConfig = {
-    apiKey: "your-api-key",
-    authDomain: "your-project-id.firebaseapp.com",
-    databaseURL: "https://your-project-id-default-rtdb.firebaseio.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project-id.firebasestorage.app",
-    messagingSenderId: "your-sender-id",
-    appId: "your-app-id",
-    measurementId: "your-measurement-id"
-};
-```
-
-Note: The `firebase.config.js` file is ignored by git to keep your credentials secure. Never commit this file to the repository.

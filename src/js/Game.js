@@ -4,7 +4,6 @@ import { UIManager } from './UIManager.js';
 import { BoardManager } from './BoardManager.js';
 import { PieceManager } from './PieceManager.js';
 import { VisibilityManager } from './VisibilityManager.js';
-import { FirebaseManager } from './FirebaseManager.js';
 import { AIManager } from './AIManager.js';
 
 /**
@@ -14,29 +13,16 @@ export class Game {
     constructor() {
         this.board = [];
         this.allPlayers = PLAYER_COLORS;
-        this.players = this.allPlayers.slice(0, 2); // Default to 2 players
-        this.currentPlayer = this.players[0];
+        this.players = [];
+        this.currentPlayer = null;
         this.selectedPiece = null;
         this.validMoves = [];
-        this.capturedPieces = {
-            white: [],
-            black: [],
-            red: [],
-            blue: []
-        };
-        this.movesRemaining = {
-            white: GAME_CONFIG.MOVES_PER_TURN,
-            black: GAME_CONFIG.MOVES_PER_TURN,
-            red: GAME_CONFIG.MOVES_PER_TURN,
-            blue: GAME_CONFIG.MOVES_PER_TURN
-        };
-        this.exploredSquares = {
-            white: new Set(),
-            black: new Set(),
-            red: new Set(),
-            blue: new Set()
-        };
+        this.capturedPieces = {};
+        this.movesRemaining = {};
+        this.exploredSquares = {};
         this.movedPieces = new Set();
+        this.isGameInProgress = false;
+        this.isProcessingTurn = false;
         
         // Initialize managers
         this.soundManager = new SoundManager();
@@ -44,64 +30,111 @@ export class Game {
         this.boardManager = new BoardManager(this);
         this.pieceManager = new PieceManager(this);
         this.visibilityManager = new VisibilityManager(this);
-        this.firebaseManager = new FirebaseManager(this);
         this.aiManager = new AIManager(this);
         this.isOnlineGame = false;
+
+        // Set up event listeners
+        this.setupEventListeners();
     }
 
     /**
-     * Initialize a new game
-     * @param {number} playerCount - Number of players
-     * @param {boolean} isOnline - Whether this is an online game
-     * @param {boolean} withAI - Whether this game includes AI players
+     * Set up event listeners for game controls
      */
-    initializeGame(playerCount, isOnline = false, withAI = false) {
+    setupEventListeners() {
+        const backToMenuButton = document.getElementById('backToMenu');
+        if (backToMenuButton) {
+            backToMenuButton.addEventListener('click', () => this.returnToMenu());
+        }
+    }
+
+    /**
+     * Return to the mode selection menu
+     */
+    returnToMenu() {
+        // Hide game container
+        const gameContainer = document.querySelector('.game-container');
+        if (gameContainer) {
+            gameContainer.style.display = 'none';
+        }
+
+        // Show mode selection menu
+        const modeSelectionMenu = document.querySelector('.mode-selection-menu');
+        if (modeSelectionMenu) {
+            modeSelectionMenu.style.display = 'flex';
+        }
+
+        // Reset game state
+        this.resetGameState();
+    }
+
+    /**
+     * Reset all game state to initial values
+     */
+    resetGameState() {
+        this.board = [];
+        this.players = [];
+        this.currentPlayer = null;
+        this.selectedPiece = null;
+        this.validMoves = [];
+        this.capturedPieces = {};
+        this.movesRemaining = {};
+        this.exploredSquares = {};
+        this.movedPieces.clear();
+        this.isOnlineGame = false;
+        this.aiManager.aiPlayers.clear();
+    }
+
+    /**
+     * Initialize game state for the given player configuration
+     */
+    initializeGameState(playerCount) {
+        // Initialize players array with the first N colors
+        this.players = this.allPlayers.slice(0, playerCount);
+        this.currentPlayer = this.players[0];
+
+        // Initialize per-player state objects
+        this.players.forEach(color => {
+            this.capturedPieces[color] = [];
+            this.movesRemaining[color] = GAME_CONFIG.MOVES_PER_TURN;
+            this.exploredSquares[color] = new Set();
+        });
+    }
+
+    /**
+     * Initialize the game with the given configuration
+     */
+    async initializeGame(playerCount, isOnline = false, withAI = false) {
         console.log('Initializing game:', { playerCount, isOnline, withAI });
         
         try {
+            // Prevent multiple initializations
+            if (this.isGameInProgress) {
+                console.log('Game already in progress, resetting first...');
+                this.resetGameState();
+            }
+
             this.isOnlineGame = isOnline;
+            this.isGameInProgress = true;
             
-            // Reset game state
-            this.players = this.allPlayers.slice(0, playerCount);
-            this.currentPlayer = this.players[0];
+            // Initialize game state
+            this.initializeGameState(playerCount);
+            
             console.log('Creating empty board...');
             this.board = this.boardManager.createEmptyBoard();
             
-            this.selectedPiece = null;
-            this.validMoves = [];
-            this.capturedPieces = {
-                white: [],
-                black: [],
-                red: [],
-                blue: []
-            };
-            this.exploredSquares = {
-                white: new Set(),
-                black: new Set(),
-                red: new Set(),
-                blue: new Set()
-            };
-            this.movedPieces.clear();
-            this.movesRemaining = {
-                white: GAME_CONFIG.MOVES_PER_TURN,
-                black: GAME_CONFIG.MOVES_PER_TURN,
-                red: GAME_CONFIG.MOVES_PER_TURN,
-                blue: GAME_CONFIG.MOVES_PER_TURN
-            };
-
             console.log('Generating terrain...');
-            this.boardManager.generateTerrain();
+            await this.boardManager.generateTerrain();
             console.log('Generating goodie huts...');
-            this.boardManager.generateGoodieHuts();
+            await this.boardManager.generateGoodieHuts();
 
             console.log('Placing players...');
             const edgePositions = this.boardManager.generateEdgePositions();
             const playerPositions = this.boardManager.assignPlayerPositions(edgePositions);
 
-            this.players.forEach(color => {
+            for (const color of this.players) {
                 console.log(`Placing pieces for ${color}...`);
-                this.placePiecesForPlayer(color, playerPositions[color]);
-            });
+                await this.placePiecesForPlayer(color, playerPositions[color]);
+            }
 
             console.log('Initializing visibility...');
             this.players.forEach(color => {
@@ -112,11 +145,18 @@ export class Game {
             });
 
             console.log('Updating game state...');
-            this.updateGameState();
+            await this.updateGameState();
+
+            // If the first player is AI, trigger their turn after a short delay
+            if (this.aiManager.isAIPlayer(this.currentPlayer)) {
+                setTimeout(() => this.aiManager.makeAIMoves(), 500);
+            }
             
             console.log('Game initialized successfully');
         } catch (error) {
             console.error('Error initializing game:', error);
+            this.isGameInProgress = false;
+            this.uiManager.showMessage('Failed to initialize game. Please try again.', 'warning');
             throw error;
         }
     }
@@ -242,11 +282,6 @@ export class Game {
      * @param {Event} event - Click event
      */
     handleSquareClick(row, col, event) {
-        // In online game, only allow moves on your turn
-        if (this.isOnlineGame && this.firebaseManager.playerName !== this.currentPlayer) {
-            return;
-        }
-
         const visibleSquares = this.visibilityManager.getVisibleSquares();
         if (!visibleSquares.has(`${row},${col}`)) {
             return; // Can't interact with fogged squares
@@ -275,11 +310,6 @@ export class Game {
 
             if (this.isValidMove(selectedRow, selectedCol, row, col)) {
                 this.movePiece(selectedRow, selectedCol, row, col);
-                
-                // Record move in Firebase for online games
-                if (this.isOnlineGame) {
-                    this.firebaseManager.recordMove(selectedRow, selectedCol, row, col);
-                }
             } else {
                 this.clearSelection();
                 if (piece && piece.color === this.currentPlayer && !this.movedPieces.has(`${row},${col}`)) {
@@ -336,6 +366,10 @@ export class Game {
         const piece = this.board[fromRow][fromCol];
         const targetCell = this.board[toRow][toCol];
 
+        // First, mark the piece as moved and decrease moves
+        this.movedPieces.add(`${toRow},${toCol}`);
+        this.movesRemaining[this.currentPlayer]--;
+
         // Handle goodie hut capture
         if (targetCell?.terrain === TERRAIN_TYPES.GOODIE_HUT) {
             this.soundManager.playGoodieHut();
@@ -348,7 +382,10 @@ export class Game {
                 this.soundManager.playCapture();
                 
                 if (targetCell.type === 'king') {
-                    this.handleKingCapture(targetCell.color);
+                    this.board[toRow][toCol] = piece;
+                    this.board[fromRow][fromCol] = null;
+                    await this.updateGameState(); // Update state before handling king capture
+                    await this.handleKingCapture(targetCell.color);
                     return;
                 }
             } else {
@@ -359,11 +396,8 @@ export class Game {
             this.board[fromRow][fromCol] = null;
         }
 
-        // Update game state
-        this.movedPieces.add(`${toRow},${toCol}`);
-        this.movesRemaining[this.currentPlayer]--;
         this.clearSelection();
-        this.updateGameState();
+        await this.updateGameState();
     }
 
     /**
@@ -390,12 +424,12 @@ export class Game {
             const newPos = adjacentPositions[Math.floor(Math.random() * adjacentPositions.length)];
             this.board[newPos.row][newPos.col] = { type: pieceType, color: this.currentPlayer };
             this.uiManager.showMessage(
-                `Your expedition discovered a new ${pieceType}! It has been placed at position (${newPos.row}, ${newPos.col}).`,
+                `You found a new ${pieceType}!`,
                 'reward'
             );
         } else {
             this.uiManager.showMessage(
-                `Found a ${pieceType} in the goodie hut, but no space to place it! The piece has been lost.`,
+                `Found a ${pieceType}, but no space to place it!`,
                 'warning'
             );
         }
@@ -405,7 +439,10 @@ export class Game {
      * Handle king capture
      * @param {string} color - Color of captured king
      */
-    handleKingCapture(color) {
+    async handleKingCapture(color) {
+        // First update the game state to show the current board
+        await this.updateGameState();
+        
         // Remove all pieces of the defeated player
         for (let row = 0; row < this.board.length; row++) {
             for (let col = 0; col < this.board[row].length; col++) {
@@ -421,15 +458,22 @@ export class Game {
         // Show defeat message
         this.uiManager.showMessage(`${color.charAt(0).toUpperCase() + color.slice(1)} has been defeated!`);
         
-        // Check if game is over
-        if (this.players.length === 1) {
-            this.gameOver(this.players[0]);
+        // Check if game is over (human player eliminated or only one player remains)
+        const isHumanEliminated = !this.players.includes('white');
+        const onlyOnePlayerLeft = this.players.length === 1;
+        
+        if (isHumanEliminated || onlyOnePlayerLeft) {
+            const winner = isHumanEliminated ? this.players[0] : 'white';
+            this.gameOver(winner);
             return;
         }
         
+        // Update game state to show removed pieces
+        await this.updateGameState();
+        
         // Switch turn if it was the current player's turn
         if (this.currentPlayer === color) {
-            this.switchTurn();
+            await this.switchTurn();
         }
     }
 
@@ -438,13 +482,6 @@ export class Game {
      * @param {string} winner - Winning player's color
      */
     gameOver(winner) {
-        if (this.isOnlineGame) {
-            this.firebaseManager.gameRef.update({
-                status: 'finished',
-                winner: winner
-            });
-        }
-
         this.soundManager.playGameOver();
         this.uiManager.showGameOver(winner);
     }
@@ -453,140 +490,57 @@ export class Game {
      * Switch to next player's turn
      */
     async switchTurn() {
-        // Disable end turn button during AI turns
-        const endTurnButton = document.querySelector('.end-turn-button');
-        if (endTurnButton) {
-            endTurnButton.disabled = true;
+        if (this.isProcessingTurn) {
+            console.log('Turn switch already in progress, ignoring request');
+            return;
         }
 
-        if (this.isOnlineGame) {
-            // For online games, update turn in Firebase
-            const gameData = await this.firebaseManager.gameRef.once('value');
-            const currentData = gameData.val();
-            const playerOrder = currentData.playerOrder;
-            const currentIndex = playerOrder.indexOf(this.currentPlayer);
-            const nextPlayer = playerOrder[(currentIndex + 1) % playerOrder.length];
-
-            await this.firebaseManager.gameRef.update({
-                currentTurn: nextPlayer
-            });
-
-            // Disable controls if it's not your turn
-            if (nextPlayer !== this.firebaseManager.playerName) {
-                this.firebaseManager.disableControls();
-            } else {
-                this.firebaseManager.enableControls();
+        try {
+            this.isProcessingTurn = true;
+            
+            // Clear any existing selection
+            this.clearSelection();
+            
+            // Get next player
+            const currentIndex = this.players.indexOf(this.currentPlayer);
+            const nextPlayer = this.players[(currentIndex + 1) % this.players.length];
+            
+            // Show turn transition screen
+            if (!this.aiManager.isAIPlayer(nextPlayer)) {
+                await this.uiManager.showTurnTransition(nextPlayer);
             }
-        }
-
-        this.movedPieces.clear();
-        const currentPlayerIndex = this.players.indexOf(this.currentPlayer);
-        const nextPlayer = this.players[(currentPlayerIndex + 1) % this.players.length];
-        
-        // Count next player's pieces before switching
-        let pieceCount = 0;
-        for (let row = 0; row < this.board.length; row++) {
-            for (let col = 0; col < this.board[row].length; col++) {
-                if (this.board[row][col]?.color === nextPlayer) {
-                    pieceCount++;
-                }
+            
+            // Update game state
+            this.currentPlayer = nextPlayer;
+            this.movesRemaining[nextPlayer] = GAME_CONFIG.MOVES_PER_TURN;
+            this.movedPieces.clear();
+            
+            // Update UI
+            await this.updateGameState();
+            
+            // If next player is AI, trigger their turn
+            if (this.aiManager.isAIPlayer(nextPlayer)) {
+                setTimeout(() => this.aiManager.makeAIMoves(), 500);
             }
-        }
-        
-        // Calculate new moves: carry over unused moves but cap at piece count
-        const unusedMoves = this.movesRemaining[nextPlayer];
-        this.movesRemaining[nextPlayer] = Math.min(GAME_CONFIG.MOVES_PER_TURN + unusedMoves, pieceCount);
-        
-        // Only play sound and show transition for human players and when switching between human players
-        const isCurrentAI = this.aiManager.isAIPlayer(this.currentPlayer);
-        const isNextAI = this.aiManager.isAIPlayer(nextPlayer);
-        
-        if (!isCurrentAI && !isNextAI) {
-            this.soundManager.playTurn();
-            await this.uiManager.showTurnTransition(nextPlayer);
-        }
-        
-        this.currentPlayer = nextPlayer;
-        this.updateGameState();
-
-        // Re-enable end turn button for human players
-        if (endTurnButton && !this.aiManager.isAIPlayer(this.currentPlayer)) {
-            endTurnButton.disabled = false;
-        }
-
-        // If next player is AI, make their moves
-        if (this.aiManager.isAIPlayer(this.currentPlayer)) {
-            await this.aiManager.makeAIMoves();
+        } catch (error) {
+            console.error('Error switching turns:', error);
+            this.uiManager.showMessage('Failed to switch turns. Please try again.', 'warning');
+        } finally {
+            this.isProcessingTurn = false;
         }
     }
 
     /**
      * Update game state and UI
      */
-    updateGameState() {
-        // Calculate visible squares for the current player
-        const visibleSquares = this.visibilityManager.getVisibleSquares();
-        
-        // If no moves remaining, mark all current player's pieces as moved
-        if (this.movesRemaining[this.currentPlayer] <= 0) {
-            for (let row = 0; row < this.board.length; row++) {
-                for (let col = 0; col < this.board[row].length; col++) {
-                    if (this.board[row][col]?.color === this.currentPlayer) {
-                        this.movedPieces.add(`${row},${col}`);
-                    }
-                }
-            }
-        }
-        
-        // Determine which squares to show based on game mode
-        let squaresToShow;
-        const isLocalGame = !this.isOnlineGame && !this.aiManager.aiPlayers.size;
-        const isAITurn = this.aiManager.isAIPlayer(this.currentPlayer);
-        
-        if (isLocalGame) {
-            // For local games (hotseat), always use fog of war
-            squaresToShow = visibleSquares;
-        } else if (this.aiManager.aiPlayers.size > 0) {
-            if (!isAITurn) {
-                // During human turns in AI games, use fog of war
-                squaresToShow = visibleSquares;
-            } else {
-                // During AI turns, show everything to make AI moves visible
-                squaresToShow = new Set();
-                for (let row = 0; row < this.board.length; row++) {
-                    for (let col = 0; col < this.board[row].length; col++) {
-                        squaresToShow.add(`${row},${col}`);
-                    }
-                }
-            }
-        } else {
-            // For online games, always use fog of war
-            squaresToShow = visibleSquares;
-        }
-        
-        // Update the UI with the current board state
-        this.uiManager.createBoard(this.board, squaresToShow);
-        this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
-        
-        // Update end turn button state
-        const endTurnButton = document.querySelector('.end-turn-button');
-        if (endTurnButton) {
-            const hasMovesLeft = this.movesRemaining[this.currentPlayer] > 0;
-            
-            // Button should be:
-            // - Disabled during AI turns
-            // - Enabled but blinking when no moves left for human
-            // - Enabled and normal when moves are available
-            if (isAITurn) {
-                endTurnButton.disabled = true;
-                endTurnButton.classList.remove('blink');
-            } else if (!hasMovesLeft) {
-                endTurnButton.disabled = false; // Enable when no moves left
-                endTurnButton.classList.add('blink');
-            } else {
-                endTurnButton.disabled = false;
-                endTurnButton.classList.remove('blink');
-            }
+    async updateGameState() {
+        try {
+            const visibleSquares = this.visibilityManager.getVisibleSquares(this.currentPlayer);
+            this.uiManager.createBoard(this.board, visibleSquares);
+            this.uiManager.updateTurnIndicator(this.currentPlayer, this.movesRemaining[this.currentPlayer]);
+        } catch (error) {
+            console.error('Error updating game state:', error);
+            this.uiManager.showMessage('Failed to update game state. Please refresh the page.', 'warning');
         }
     }
 } 

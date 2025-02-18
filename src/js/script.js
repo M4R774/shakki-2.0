@@ -3,74 +3,115 @@ import { Game } from './Game.js';
 // Start the game only after DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM Content Loaded');
-    const game = new Game();
+    let game = new Game();
+    let isInitializing = false;
     
     // Set up mode selection handlers
-    const localBtn = document.getElementById('localMode');
-    const aiBtn = document.getElementById('aiMode');
+    const newGameBtn = document.getElementById('newGameBtn');
     const multiPlayerBtn = document.getElementById('multiPlayerMode');
     const startButton = document.getElementById('startGame');
     const gameContainer = document.querySelector('.game-container');
     const modeSelectionMenu = document.querySelector('.mode-selection-menu');
-    const aiSetupMenu = document.querySelector('.ai-setup-menu');
-    const startAiGameBtn = document.getElementById('startAiGame');
-    const backFromAiSetupBtn = document.getElementById('backFromAiSetup');
+    const setupMenu = document.querySelector('.ai-setup-menu');
+    const startGameSetupBtn = document.getElementById('startGameSetup');
+    const backFromSetupBtn = document.getElementById('backFromSetup');
+    const totalPlayerCountSelect = document.getElementById('totalPlayerCount');
 
     console.log('Elements found:', { 
-        localBtn, 
-        aiBtn, 
+        newGameBtn, 
         multiPlayerBtn, 
         startButton, 
         gameContainer, 
         modeSelectionMenu,
-        aiSetupMenu,
-        startAiGameBtn,
-        backFromAiSetupBtn
+        setupMenu,
+        startGameSetupBtn,
+        backFromSetupBtn,
+        totalPlayerCountSelect
     });
 
-    // Local game mode
-    localBtn.addEventListener('click', () => {
-        console.log('Local button clicked');
+    // Initialize player setup visibility
+    function initializePlayerSetup() {
+        const playerCount = parseInt(totalPlayerCountSelect.value);
+        const setupSections = [
+            document.getElementById('player1Setup'),
+            document.getElementById('player2Setup'),
+            document.getElementById('player3Setup'),
+            document.getElementById('player4Setup')
+        ];
+
+        setupSections.forEach((section, index) => {
+            if (section) {
+                section.style.display = index < playerCount ? 'flex' : 'none';
+                
+                // Reset select to "Human" when hidden
+                if (index >= playerCount) {
+                    const select = section.querySelector('select');
+                    if (select) select.value = 'human';
+                }
+            }
+        });
+    }
+
+    // New Game button
+    newGameBtn.addEventListener('click', () => {
+        console.log('New Game button clicked');
         modeSelectionMenu.style.display = 'none';
-        gameContainer.style.display = 'flex';
-        startButton.style.display = 'block';
-        startButton.textContent = 'Restart Game';
-        
-        const playerCount = parseInt(document.getElementById('playerCount').value);
-        console.log('Starting local game with', playerCount, 'players');
-        game.initializeGame(playerCount, false, false);
+        setupMenu.style.display = 'flex';
+        initializePlayerSetup();
     });
 
-    // AI game mode
-    aiBtn.addEventListener('click', () => {
-        console.log('AI button clicked');
-        modeSelectionMenu.style.display = 'none';
-        aiSetupMenu.style.display = 'flex';
+    // Handle player count changes
+    totalPlayerCountSelect.addEventListener('change', () => {
+        initializePlayerSetup();
     });
 
-    // AI setup menu handlers
-    startAiGameBtn.addEventListener('click', () => {
-        console.log('Start AI game button clicked');
-        const aiPlayerCount = parseInt(document.getElementById('aiPlayerCount').value);
-        const totalPlayers = aiPlayerCount + 1; // +1 for human player
-        
-        console.log('Starting AI game with', aiPlayerCount, 'AI players');
-        aiSetupMenu.style.display = 'none';
-        gameContainer.style.display = 'flex';
-        startButton.style.display = 'block';
-        startButton.textContent = 'Restart Game';
-        
-        game.initializeGame(totalPlayers, false, true);
-        
-        // Add AI players based on the selected count
-        const playerColors = ['black', 'red', 'blue'];
-        for (let i = 0; i < aiPlayerCount; i++) {
-            game.aiManager.addAIPlayer(playerColors[i]);
+    // Game setup menu handlers
+    startGameSetupBtn.addEventListener('click', async () => {
+        if (isInitializing) {
+            console.log('Game initialization already in progress');
+            return;
+        }
+
+        try {
+            isInitializing = true;
+            console.log('Start Game Setup button clicked');
+            
+            const totalPlayers = parseInt(totalPlayerCountSelect.value);
+            const playerTypes = [];
+            
+            // Collect player types (human/ai)
+            for (let i = 1; i <= totalPlayers; i++) {
+                const playerType = document.getElementById(`player${i}Type`).value;
+                playerTypes.push(playerType);
+            }
+            
+            console.log('Starting game with configuration:', { totalPlayers, playerTypes });
+            setupMenu.style.display = 'none';
+            gameContainer.style.display = 'flex';
+            startButton.style.display = 'block';
+            startButton.textContent = 'Restart Game';
+            
+            // Initialize the game with the player configuration
+            await game.initializeGame(totalPlayers, false);
+            
+            // Add AI players based on the configuration
+            const playerColors = ['white', 'black', 'red', 'blue'];
+            playerTypes.forEach((type, index) => {
+                if (type === 'ai') {
+                    game.aiManager.addAIPlayer(playerColors[index]);
+                }
+            });
+        } catch (error) {
+            console.error('Failed to start game:', error);
+            setupMenu.style.display = 'flex';
+            gameContainer.style.display = 'none';
+        } finally {
+            isInitializing = false;
         }
     });
 
-    backFromAiSetupBtn.addEventListener('click', () => {
-        aiSetupMenu.style.display = 'none';
+    backFromSetupBtn.addEventListener('click', () => {
+        setupMenu.style.display = 'none';
         modeSelectionMenu.style.display = 'flex';
     });
 
@@ -80,35 +121,50 @@ document.addEventListener('DOMContentLoaded', () => {
     multiPlayerBtn.style.cursor = 'not-allowed';
 
     // Start/Restart button
-    startButton.addEventListener('click', () => {
-        console.log('Start/Restart button clicked');
-        if (game.aiManager.aiPlayers.size > 0) {
-            // Restart AI game
-            console.log('Restarting AI game');
-            const aiPlayerCount = game.aiManager.aiPlayers.size;
-            const totalPlayers = aiPlayerCount + 1;
+    startButton.addEventListener('click', async () => {
+        if (isInitializing) {
+            console.log('Game initialization already in progress');
+            return;
+        }
+
+        try {
+            isInitializing = true;
+            console.log('Start/Restart button clicked');
             
-            game.initializeGame(totalPlayers, false, true);
+            const totalPlayers = parseInt(totalPlayerCountSelect.value);
+            const playerTypes = [];
             
-            // Re-add AI players
-            const playerColors = ['black', 'red', 'blue'];
-            for (let i = 0; i < aiPlayerCount; i++) {
-                game.aiManager.addAIPlayer(playerColors[i]);
+            // Re-collect player types for restart
+            for (let i = 1; i <= totalPlayers; i++) {
+                const playerType = document.getElementById(`player${i}Type`).value;
+                playerTypes.push(playerType);
             }
-        } else {
-            // Restart local game
-            const playerCount = parseInt(document.getElementById('playerCount').value);
-            console.log('Restarting local game with', playerCount, 'players');
-            game.initializeGame(playerCount, false, false);
+            
+            // Initialize the game with the player configuration
+            await game.initializeGame(totalPlayers, false);
+            
+            // Add AI players based on the configuration
+            const playerColors = ['white', 'black', 'red', 'blue'];
+            playerTypes.forEach((type, index) => {
+                if (type === 'ai') {
+                    game.aiManager.addAIPlayer(playerColors[index]);
+                }
+            });
+        } catch (error) {
+            console.error('Failed to restart game:', error);
+        } finally {
+            isInitializing = false;
         }
     });
 
     // End turn button
     const endTurnButton = document.querySelector('.end-turn-button');
     if (endTurnButton) {
-        endTurnButton.addEventListener('click', () => {
-            console.log('End turn button clicked');
-            game.switchTurn();
+        endTurnButton.addEventListener('click', async () => {
+            if (!game.isProcessingTurn) {
+                console.log('End turn button clicked');
+                await game.switchTurn();
+            }
         });
     }
 
