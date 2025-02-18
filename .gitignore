@@ -1,6 +1,13 @@
-# VS Code settings
-.vscode/
+# Firebase configuration
+src/config/firebase.config.js
 
-# Common system files
+# Dependencies
+node_modules/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS generated files
 .DS_Store
 Thumbs.db 

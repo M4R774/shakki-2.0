@@ -9,26 +9,28 @@ export class VisibilityManager {
     }
 
     /**
-     * Get all squares visible to the current player
+     * Get all squares visible to the specified player
+     * @param {string} [playerColor] - Color of the player to get visibility for (defaults to current player)
      * @returns {Set} Set of visible square coordinates
      */
-    getVisibleSquares() {
+    getVisibleSquares(playerColor = null) {
+        const color = playerColor || this.game.currentPlayer;
         const visibleSquares = new Set();
         
         // Add all squares within vision range of current player's pieces
         for (let row = 0; row < this.game.board.length; row++) {
             for (let col = 0; col < this.game.board[row].length; col++) {
                 const piece = this.game.board[row][col];
-                if (piece?.color === this.game.currentPlayer) {
+                if (piece?.color === color) {
                     const visionRange = this.getVisionRange(piece.type);
                     this.addVisibleSquaresInRange(row, col, visionRange, visibleSquares, piece.type);
                 }
             }
         }
         
-        // Add visible squares to current player's explored squares
+        // Add visible squares to player's explored squares
         visibleSquares.forEach(square => {
-            this.game.exploredSquares[this.game.currentPlayer].add(square);
+            this.game.exploredSquares[color].add(square);
         });
         
         return visibleSquares;

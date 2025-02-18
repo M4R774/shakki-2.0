@@ -7,7 +7,54 @@
     <link rel="stylesheet" href="src/css/styles.css">
 </head>
 <body>
-    <div class="game-container">
+    <div class="mode-selection-menu">
+        <div class="menu-content">
+            <h2>Select Game Mode</h2>
+            <button id="localMode" class="control-button">Local (Hotseat)</button>
+            <button id="aiMode" class="control-button">Play vs AI</button>
+            <button id="multiPlayerMode" class="control-button" disabled style="opacity: 0.6; cursor: not-allowed;">Online Multiplayer (Coming Soon)</button>
+        </div>
+    </div>
+
+    <div class="ai-setup-menu" style="display: none;">
+        <div class="menu-content">
+            <h2>AI Game Setup</h2>
+            <div class="setup-options">
+                <label for="aiPlayerCount">Number of AI Players:</label>
+                <select id="aiPlayerCount">
+                    <option value="1" selected>1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                </select>
+            </div>
+            <button id="startAiGame" class="control-button">Start Game</button>
+            <button id="backFromAiSetup" class="control-button">Back</button>
+        </div>
+    </div>
+
+    <div class="multiplayer-menu" style="display: none;">
+        <div class="menu-content">
+            <h2>Online Multiplayer</h2>
+            <div class="auth-section">
+                <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+                <button id="joinGame" class="control-button">Join Game</button>
+            </div>
+            <div class="room-section" style="display: none;">
+                <input type="text" id="roomCode" placeholder="Enter room code">
+                <button id="createRoom" class="control-button">Create Room</button>
+                <button id="joinRoom" class="control-button">Join Room</button>
+                <button id="backToModeSelect" class="control-button">Back</button>
+            </div>
+            <div class="room-info" style="display: none;">
+                <h3>Room: <span id="currentRoom"></span></h3>
+                <div id="playerList"></div>
+                <button id="startOnlineGame" class="control-button" disabled>Start Game</button>
+                <button id="leaveRoom" class="control-button">Leave Room</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-container" style="display: none;">
         <div class="game-header">
             <div class="turn-indicator white">Current Turn: White</div>
             <div class="controls-container">
@@ -68,5 +115,24 @@
     </audio>
 
     <script type="module" src="src/js/script.js"></script>
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-analytics.js";
+        import { getDatabase } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-database.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/11.3.1/firebase-auth.js";
+        import { firebaseConfig } from "./src/config/firebase.config.js";
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const database = getDatabase(app);
+        const auth = getAuth(app);
+
+        // Make Firebase instances available globally
+        window.firebaseApp = app;
+        window.firebaseDatabase = database;
+        window.firebaseAuth = auth;
+    </script>
 </body>
 </html>

@@ -8,27 +8,6 @@ export class UIManager {
     constructor(game) {
         this.game = game;
         this.chessboard = document.querySelector('.chessboard');
-        this.setupEventListeners();
-    }
-
-    /**
-     * Set up event listeners for UI elements
-     */
-    setupEventListeners() {
-        const playerCount = document.getElementById('playerCount');
-        const startButton = document.getElementById('startGame');
-        const endTurnButton = document.querySelector('.end-turn-button');
-        
-        startButton.addEventListener('click', () => {
-            this.game.initializeGame(parseInt(playerCount.value));
-            startButton.textContent = 'New Game';
-        });
-
-        if (endTurnButton) {
-            endTurnButton.addEventListener('click', () => {
-                this.game.switchTurn();
-            });
-        }
     }
 
     /**
@@ -37,6 +16,11 @@ export class UIManager {
      * @param {Set} visibleSquares - Set of visible square coordinates
      */
     createBoard(board, visibleSquares) {
+        if (!this.chessboard) {
+            console.error('Chessboard element not found');
+            return;
+        }
+        
         this.chessboard.innerHTML = '';
         
         for (let row = 0; row < board.length; row++) {
@@ -86,15 +70,19 @@ export class UIManager {
             dataset: { row, col }
         });
 
+        // Add fog of war styling
         if (!isVisible) {
             square.classList.add('fog');
             if (isExplored) {
                 square.classList.add('explored');
+                // Only show terrain in explored but not visible squares
                 if (cell?.terrain) {
                     this.addTerrainToSquare(square, cell);
                 }
+                // Do not show pieces in explored but not visible squares
             }
         } else {
+            // Show everything in visible squares
             if (cell?.terrain) {
                 this.addTerrainToSquare(square, cell);
             } else if (cell) {
